@@ -1,0 +1,22 @@
+{
+  "name": "card-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline custom card creator (desktop and mobile).",
+  "scripts": {
+    "import-engine": "node scripts/import-engine.mjs",
+    "serve": "node scripts/serve.mjs",
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "android:init": "tauri android init",
+    "android:build": "tauri android build --apk"
+  },
+  "devDependencies": {
+    "@fontsource/poppins": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
+    "@tauri-apps/cli": "^2.9.0",
+    "keyrune": "^3.19.0",
+    "sharp": "^0.33.5"
+  }
+}
