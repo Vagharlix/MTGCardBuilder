@@ -26,7 +26,7 @@ Les fichiers d'installation sont produits par GitHub Actions :
 | Système | Fichier | Remarque |
 |---|---|---|
 | Windows | `Card Studio_x.y.z_x64-setup.exe` ou `.msi` | Si SmartScreen s'affiche : « Informations complémentaires → Exécuter quand même ». |
-| macOS (Apple Silicon) | `Card Studio_x.y.z_aarch64.dmg` | Case « macOS » décochée par défaut (minutes x10 sur un dépôt privé). L'app n'est pas signée : la première fois, clic droit → Ouvrir. Si macOS refuse encore : `xattr -cr "/Applications/Card Studio.app"`. Pour un Mac Intel : `npx tauri build` sur le Mac. |
+| macOS (Apple Silicon) | `Card Studio_x.y.z_aarch64.dmg` | L'app n'est pas signée : la première fois, clic droit → Ouvrir. Si macOS refuse encore : `xattr -cr "/Applications/Card Studio.app"`. Pour un Mac Intel : `npx tauri build` sur le Mac. |
 | Linux (toutes distributions) | `card-studio_x.y.z_amd64.AppImage` | `chmod +x *.AppImage` puis double-clic. |
 | Debian / Ubuntu / Mint | `.deb` | `sudo apt install ./card-studio_*.deb` |
 | Fedora / openSUSE | `.rpm` | `sudo dnf install ./card-studio-*.rpm` |
