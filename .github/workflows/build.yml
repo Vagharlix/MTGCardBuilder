@@ -1,9 +1,26 @@
 name: Build apps
 
-# Run manually from the "Actions" tab, or push a tag like v1.0.1 to also
-# publish the files in a GitHub Release.
+# Run it from the "Actions" tab (tick the platforms you want), or push a tag
+# like v1.0.1 to build every platform and publish the files in a Release.
 on:
   workflow_dispatch:
+    inputs:
+      windows:
+        description: Windows (.exe / .msi)
+        type: boolean
+        default: true
+      linux:
+        description: Linux (.AppImage / .deb / .rpm)
+        type: boolean
+        default: true
+      android:
+        description: Android (.apk)
+        type: boolean
+        default: true
+      macos:
+        description: macOS Apple Silicon (.dmg) - uses 10x minutes on private repos
+        type: boolean
+        default: false
   push:
     tags: ['v*']
 
@@ -15,21 +32,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      desktop: ${{ steps.plan.outputs.desktop }}
+      android: ${{ steps.plan.outputs.android }}
+    steps:
+      - id: plan
+        env:
+          ALL: ${{ github.event_name != 'workflow_dispatch' }}
+          WINDOWS: ${{ inputs.windows }}
+          LINUX: ${{ inputs.linux }}
+          MACOS: ${{ inputs.macos }}
+          ANDROID: ${{ inputs.android }}
+        run: |
+          items=()
+          if [ "$ALL" = true ] || [ "$LINUX" = true ]; then items+=('{"name":"Linux","os":"ubuntu-22.04","args":""}'); fi
+          if [ "$ALL" = true ] || [ "$WINDOWS" = true ]; then items+=('{"name":"Windows","os":"windows-latest","args":""}'); fi
+          if [ "$ALL" = true ] || [ "$MACOS" = true ]; then items+=('{"name":"macOS","os":"macos-latest","args":"--target aarch64-apple-darwin"}'); fi
+          joined=$(IFS=,; echo "${items[*]}")
+          echo "desktop={\"include\":[${joined}]}" >> "$GITHUB_OUTPUT"
+          if [ "$ALL" = true ] || [ "$ANDROID" = true ]; then echo "android=true" >> "$GITHUB_OUTPUT"; else echo "android=false" >> "$GITHUB_OUTPUT"; fi
+
   desktop:
     name: Desktop (${{ matrix.name }})
+    needs: plan
+    if: needs.plan.outputs.desktop != '{"include":[]}'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: Linux
-            os: ubuntu-22.04
-            args: ''
-          - name: Windows
-            os: windows-latest
-            args: ''
-          - name: macOS
-            os: macos-latest
-            args: '--target universal-apple-darwin'
+      matrix: ${{ fromJSON(needs.plan.outputs.desktop) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +78,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin' || '' }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -72,16 +103,18 @@ jobs:
           name: card-studio-${{ matrix.name }}
           path: dist/*
           if-no-files-found: error
+          compression-level: 0
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          draft: false
 
   android:
     name: Android
+    needs: plan
+    if: needs.plan.outputs.android == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -94,16 +127,19 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - name: Android NDK
-        run: sdkmanager "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "ndk;27.2.12479018"
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # arm64 only: the card images are embedded in the native library, so each
+      # extra architecture would add ~280 MB to the APK. Every phone sold since
+      # ~2017 is arm64.
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          targets: aarch64-linux-android
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -112,7 +148,7 @@ jobs:
       - run: npm ci
 
       # The signing key lives in repository secrets (Settings > Secrets and variables > Actions):
-      #   ANDROID_KEYSTORE_BASE64  = base64 of card-studio.jks
+      #   ANDROID_KEYSTORE_BASE64   = base64 of card-studio.jks
       #   ANDROID_KEYSTORE_PASSWORD = its password (alias: card-studio)
       # Without them a throw-away key is used: that APK installs, but cannot
       # update a version signed with another key (uninstalling erases the gallery).
@@ -134,15 +170,15 @@ jobs:
           printf "storeFile=card-studio.jks\nstorePassword=%s\nkeyAlias=card-studio\nkeyPassword=%s\n" "$PASS" "$PASS" > signing.properties
 
       - name: Build APK
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
-        run: npx tauri android build --apk --target aarch64 armv7 x86_64
+        run: |
+          export NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
+          npx tauri android build --apk --target aarch64
 
       - name: Collect APK
         run: |
           mkdir -p dist
           find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' -exec cp {} dist/ \;
-          for f in dist/*.apk; do mv "$f" "dist/Card-Studio-$(basename "$f" | sed 's/app-//')"; done
+          for f in dist/*.apk; do mv "$f" "dist/Card-Studio-${GITHUB_REF_NAME//\//-}-arm64.apk"; break; done
           ls -la dist
 
       - uses: actions/upload-artifact@v4
@@ -150,10 +186,10 @@ jobs:
           name: card-studio-Android
           path: dist/*.apk
           if-no-files-found: error
+          compression-level: 0
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.apk
-          draft: false
