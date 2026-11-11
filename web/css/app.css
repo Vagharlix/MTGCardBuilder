@@ -64,6 +64,11 @@ body {
 	padding-bottom: env(safe-area-inset-bottom);
 }
 button, input, select, textarea { font: inherit; color: inherit; }
+/* No text-selection flashes on clickable tiles (WebKit needs the prefix). */
+.frame-option, .mask-option, .frame-element, .creator-menu-tabs > h3, .btn-red, .btn-orange, .watermark-item,
+.symbol-bar button, .gallery-card img, .creator-canvas, .collapsible, .checkbox-container, #text-options > * {
+	-webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
 a { color: var(--purple); }
 img { max-width: 100%; }
 .hidden { display: none !important; }
