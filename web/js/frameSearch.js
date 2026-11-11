@@ -264,9 +264,9 @@ function autocomplete(inp, arr) {
 			if (arr[i].toUpperCase().includes(val.toUpperCase())) {
 				b = document.createElement("DIV");
 				b.setAttribute("class", "input")
-				b.innerHTML = arr[i];
+				b.textContent = arr[i];
 				b.addEventListener("click", function(e) {
-					inp.value = this.innerHTML;
+					inp.value = this.textContent;
 					frameSearch(inp.value);
               		closeAllLists();
           		});
