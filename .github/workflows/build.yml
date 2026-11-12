@@ -124,10 +124,12 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
-
+      # SDK and NDK are preinstalled on the ubuntu runners (ANDROID_HOME,
+      # ANDROID_NDK_LATEST_HOME); Tauri expects NDK_HOME.
       - name: Android NDK
-        run: sdkmanager "ndk;27.2.12479018"
+        run: |
+          test -d "$ANDROID_NDK_LATEST_HOME"
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
@@ -170,9 +172,7 @@ jobs:
           printf "storeFile=card-studio.jks\nstorePassword=%s\nkeyAlias=card-studio\nkeyPassword=%s\n" "$PASS" "$PASS" > signing.properties
 
       - name: Build APK
-        run: |
-          export NDK_HOME="$ANDROID_HOME/ndk/27.2.12479018"
-          npx tauri android build --apk --target aarch64
+        run: npx tauri android build --apk --target aarch64
 
       - name: Collect APK
         run: |
