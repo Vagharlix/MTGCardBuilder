@@ -105,12 +105,6 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-
   android:
     name: Android
     needs: plan
@@ -188,8 +182,35 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  # One job publishes the release once every build is done (parallel jobs
+  # creating the same release can race).
+  release:
+    name: Publish release
+    needs: [desktop, android]
+    if: startsWith(github.ref, 'refs/tags/v') && !cancelled() && needs.desktop.result == 'success' && needs.android.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          files: dist/*.apk
+          path: dist
+          merge-multiple: true
+
+      - run: ls -la dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Card Studio ${{ github.ref_name }}
+          files: dist/*
+          body: |
+            Éditeur de cartes hors ligne. Télécharge le fichier de ton système :
+
+            **Windows** : `…_x64-setup.exe` (ou le `.msi`). Si SmartScreen s'affiche : « Informations complémentaires » → « Exécuter quand même ».
+
+            **macOS (Apple Silicon)** : `…_aarch64.dmg`. App non signée : la première fois, clic droit → Ouvrir.
+
+            **Linux** :
+            - Debian / Ubuntu / Mint : le `.deb` (`sudo apt install ./fichier.deb`)
+            - Fedora / openSUSE : le `.rpm` (`sudo dnf install ./fichier.rpm`)
+            - Autres distributions : l'`.AppImage` (`chmod +x`, puis la lancer)
+
+            **Android** : `Card-Studio-…-arm64.apk`. Autorise l'installation d'applis inconnues. Pour mettre à jour, installe par-dessus l'ancienne version, sans la désinstaller (sinon la galerie est effacée).
